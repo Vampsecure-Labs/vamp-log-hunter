@@ -61,6 +61,7 @@ from __future__ import annotations
 
 # Biblioteca estándar
 import argparse
+import asyncio
 import gzip
 import html as _html_module
 import ipaddress
@@ -1951,6 +1952,149 @@ def _to_vsl(findings: List[IoCFinding]) -> List[VSLFinding]:
 # Punto de entrada principal
 # ---------------------------------------------------------------------------
 
+# =============================================================================
+# ENRIQUECIMIENTO DE IPs CON FEEDS DE THREAT INTELLIGENCE
+# =============================================================================
+
+async def _enrich_single_ip(
+    session,
+    ip: str,
+    abuseipdb_key: str,
+    otx_key: str,
+) -> dict:
+    """
+    Consulta AbuseIPDB y OTX AlienVault para una IP concreta.
+
+    Retorna un dict con los campos de enriquecimiento disponibles.
+    Errores de red se tragan silenciosamente: la función siempre retorna.
+    """
+    result: dict = {"ip": ip, "abuseipdb": None, "otx": None}
+    UA = f"{TOOL_NAME}/{VERSION}"
+
+    # ── AbuseIPDB v2 ────────────────────────────────────────────────────────
+    if abuseipdb_key:
+        try:
+            headers = {"Key": abuseipdb_key, "Accept": "application/json", "User-Agent": UA}
+            params  = {"ipAddress": ip, "maxAgeInDays": "90", "verbose": ""}
+            async with session.get(
+                "https://api.abuseipdb.com/api/v2/check",
+                headers=headers, params=params, timeout=10, ssl=True,
+            ) as r:
+                if r.status == 200:
+                    data = await r.json(content_type=None)
+                    d    = data.get("data", {})
+                    result["abuseipdb"] = {
+                        "score":        d.get("abuseConfidenceScore", 0),
+                        "total_reports": d.get("totalReports", 0),
+                        "usage_type":   d.get("usageType", ""),
+                        "isp":          d.get("isp", ""),
+                        "country":      d.get("countryCode", ""),
+                        "whitelisted":  d.get("isWhitelisted", False),
+                    }
+        except Exception:
+            pass
+
+    # ── OTX AlienVault ────────────────────────────────────────────────────────
+    try:
+        headers_otx: dict = {"User-Agent": UA}
+        if otx_key:
+            headers_otx["X-OTX-API-KEY"] = otx_key
+        async with session.get(
+            f"https://otx.alienvault.com/api/v1/indicators/IPv4/{ip}/general",
+            headers=headers_otx, timeout=10, ssl=True,
+        ) as r:
+            if r.status == 200:
+                data = await r.json(content_type=None)
+                result["otx"] = {
+                    "pulse_count": data.get("pulse_info", {}).get("count", 0),
+                    "reputation":  data.get("reputation", 0),
+                }
+    except Exception:
+        pass
+
+    return result
+
+
+async def enrich_ip_threat_feeds(
+    ips: List[str],
+    abuseipdb_key: str,
+    otx_key: str,
+    console: "Console",
+) -> dict:
+    """
+    Enriquece una lista de IPs con AbuseIPDB y OTX en paralelo.
+
+    Retorna un dict {ip: enrich_dict} con los resultados de cada IP.
+    Las consultas se hacen en paralelo con semáforo de 5 slots para no
+    saturar las APIs (especialmente AbuseIPDB Free: 1000 peticiones/día).
+    """
+    import aiohttp as _aiohttp
+
+    if not ips:
+        return {}
+
+    sem = asyncio.Semaphore(5)
+
+    async def _guarded(session, ip: str) -> tuple:
+        async with sem:
+            r = await _enrich_single_ip(session, ip, abuseipdb_key, otx_key)
+            return ip, r
+
+    console.print(
+        f"\n[bold cyan]  FASE EXTRA — Enriquecimiento TI de {len(ips)} IPs[/]\n"
+    )
+    enriched: dict = {}
+
+    async with _aiohttp.ClientSession() as session:
+        tasks = [asyncio.create_task(_guarded(session, ip)) for ip in ips]
+        for coro in asyncio.as_completed(tasks):
+            ip, data = await coro
+            enriched[ip] = data
+
+            # Mostrar resumen por IP en tiempo real
+            abuse = data.get("abuseipdb")
+            otx   = data.get("otx")
+            parts = []
+            if abuse:
+                score = abuse["score"]
+                color = "red" if score >= 50 else ("yellow" if score >= 20 else "green")
+                parts.append(f"[{color}]AbuseIPDB {score}%[/] ({abuse['total_reports']} reports)")
+            if otx:
+                pulses = otx["pulse_count"]
+                color  = "red" if pulses >= 5 else ("yellow" if pulses >= 1 else "green")
+                parts.append(f"[{color}]OTX {pulses} pulses[/]")
+            if not parts:
+                parts.append("[dim]sin datos[/]")
+            console.print(f"  {ip} — " + " · ".join(parts))
+
+    return enriched
+
+
+def _apply_enrichment_to_findings(
+    findings: "List[IoCFinding]",
+    enriched: dict,
+) -> None:
+    """
+    Añade etiquetas de threat intelligence a los hallazgos que contienen
+    IPs enriquecidas. Modifica los hallazgos in-place.
+    """
+    for finding in findings:
+        for ip in finding.source_ips:
+            data = enriched.get(ip)
+            if not data:
+                continue
+            abuse = data.get("abuseipdb")
+            otx   = data.get("otx")
+            if abuse and abuse["score"] >= 50:
+                tag = f"AbuseIPDB:{ip}={abuse['score']}%({abuse['total_reports']}rep)"
+                if tag not in finding.tags:
+                    finding.tags.append(tag)
+            if otx and otx["pulse_count"] >= 1:
+                tag = f"OTX:{ip}={otx['pulse_count']}pulses"
+                if tag not in finding.tags:
+                    finding.tags.append(tag)
+
+
 def main() -> int:
     """
     Punto de entrada principal de vamp-log-hunter.
@@ -2007,6 +2151,25 @@ def main() -> int:
     ag.add_argument(
         "--threshold-scan", metavar="INT", type=int, default=20,
         help="Umbral de rutas únicas con 404 para escaneo de directorios (por defecto: 20)",
+    )
+
+    # ── Grupo de enriquecimiento con feeds de amenazas ────────────────────
+    ti = parser.add_argument_group("Threat Intelligence (enriquecimiento de IPs)")
+    ti.add_argument(
+        "--enrich-ips", action="store_true",
+        help="Enriquecer las IPs detectadas con AbuseIPDB y OTX AlienVault "
+             "(requiere --abuseipdb-key y/o --otx-key)",
+    )
+    ti.add_argument(
+        "--abuseipdb-key", metavar="API_KEY",
+        help="Clave API AbuseIPDB v2 (o var ABUSEIPDB_API_KEY) — "
+             "consulta la reputación y número de reportes de cada IP",
+    )
+    ti.add_argument(
+        "--otx-key", metavar="API_KEY",
+        help="Clave API OTX AlienVault (o var OTX_API_KEY; opcional, "
+             "el endpoint público funciona sin clave) — "
+             "consulta los pulses de amenaza asociados a cada IP",
     )
 
     # ── Grupo de exportación ──────────────────────────────────────────────
@@ -2084,6 +2247,34 @@ def main() -> int:
 
     # ── Generación y presentación de hallazgos ───────────────────────────
     findings = scanner.generate_findings()
+
+    # ── Enriquecimiento con Threat Intelligence (--enrich-ips) ───────────
+    if getattr(args, "enrich_ips", False):
+        abuseipdb_key = getattr(args, "abuseipdb_key", None) or os.environ.get("ABUSEIPDB_API_KEY", "")
+        otx_key       = getattr(args, "otx_key", None) or os.environ.get("OTX_API_KEY", "")
+        if not abuseipdb_key and not otx_key:
+            console.print(
+                "[yellow]⚠ --enrich-ips: se necesita --abuseipdb-key o --otx-key "
+                "(o las variables de entorno ABUSEIPDB_API_KEY / OTX_API_KEY)[/]"
+            )
+        else:
+            # Recolectar IPs únicas de todos los hallazgos (excluyendo escaners conocidos)
+            unique_ips: List[str] = []
+            seen_ips: set = set()
+            for f in findings:
+                for ip in f.source_ips:
+                    if ip not in seen_ips and not _is_known_scanner(ip):
+                        seen_ips.add(ip)
+                        unique_ips.append(ip)
+            unique_ips = unique_ips[:50]    # límite para no agotar cuota de APIs gratuitas
+
+            if unique_ips:
+                enriched = asyncio.run(
+                    enrich_ip_threat_feeds(unique_ips, abuseipdb_key, otx_key, console)
+                )
+                _apply_enrichment_to_findings(findings, enriched)
+            else:
+                console.print("[dim]  --enrich-ips: no hay IPs que enriquecer.[/]")
 
     _print_summary(console, findings, scanner)
     _print_findings(console, findings)
