@@ -103,7 +103,7 @@ from vampsec_report import (
 # Metadatos de la herramienta
 # ---------------------------------------------------------------------------
 
-VERSION   = "1.0"
+VERSION   = "1.1"
 TOOL_NAME = "vamp-log-hunter"
 AUTHOR    = "© VampSecure Studios — VampSecure Labs Security Research Division"
 
@@ -1497,21 +1497,19 @@ def _update_ts(d: dict, ts: Optional[datetime]) -> None:
 
 def _print_banner(console: Console) -> None:
     """Muestra el banner de inicio de vamp-log-hunter."""
-    console.print()
-    console.print(
-        "[bold red]╔══╗  ╔═╗ ╔╗╔╗ ╔══╗[/]  "
-        "[bold white]LOG HUNTER[/]"
+    banner = (
+        "\n"
+        "  ____   ____    _    __  __ ____  _____ ____ _   _ ____  _____   _        _    ____ ____\n"
+        " \\ \\ / / _  |  / \\  |  \\/  |  _ \\/ ____/ ___| | | |  _ \\| ____| | |      / \\  | __ ) ___|\n"
+        "  \\ V / (_| | / _ \\ | |\\/| | |_) \___ \\| |___| | | | |_) |  _|   | |     / _ \\ |  _ \___ \\\n"
+        "   | |  \\__, |/ ___ \\| |  | |  __/ ___) |___  | |_| |  _ <| |___  | |___ / ___ \\| |_) |__) |\n"
+        "   |_|     /_/_/   \_|_|  |_|_|   |____/\\____|\\___/|_| \_|_____| |_____/_/   \_|____/____/\n"
+        '     by Antonio Hernandez "Belky" — VampSecure Studios · vamp-log-hunter v1.1 · Cazador de IoC en Logs\n'
+        "     ─────────────────────────────────────────────────────────────────────────────────────────\n"
+        "     USO EXCLUSIVO EN AUDITORÍAS AUTORIZADAS · El uso no autorizado es ilegal\n"
     )
-    console.print(
-        "[bold red]╚══╗  ╠═╣ ║╚╝║ ╠══╝[/]  "
-        f"[dim]v{VERSION} · VampSecure Labs[/]"
-    )
-    console.print(
-        "[bold red]═══╝  ╩ ╩ ╩  ╩ ╩    [/]  "
-        "[dim]Cazador de IoC en Logs del Sistema[/]"
-    )
-    console.print(f"[dim]{AUTHOR}[/]")
-    console.print()
+    console.print(banner, style="bold red")
+
 
 
 def _print_summary(
