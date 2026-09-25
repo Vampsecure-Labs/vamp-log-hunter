@@ -49,8 +49,34 @@ EJEMPLOS
   # Exportar informe JSON y HTML oscuro:
   python3 vamp_log_hunter.py --json informe.json --html informe.html
 
+  # Limitar la tabla de atacantes a las 20 IPs más activas:
+  python3 vamp_log_hunter.py --max-ips 20
+
   # Lectura desde stdin:
   cat /var/log/nginx/access.log | python3 vamp_log_hunter.py --file -
+
+ARGUMENTOS DESTACADOS
+---------------------
+  --max-ips N   Máximo de IPs a mostrar en la tabla de atacantes (default: 10)
+  --fast-mode   Triaje rápido (<5 s): últimas 1000 líneas, solo IoC críticos
+
+DIFERENCIAS CON vamp-log-analyzer
+----------------------------------
+vamp-log-hunter es una herramienta **táctica** de detección de IoC orientada a
+análisis rápido de logs del sistema. Detecta indicadores de compromiso concretos
+(fuerza bruta, SQLi, webshells, escalada de privilegios…) con correlación
+temporal y enriquecimiento de IPs en tiempo real, y produce hallazgos
+directamente accionables para respuesta a incidentes.
+
+vamp-log-analyzer es una herramienta **forense** y narrativa. Utiliza LLMs
+(Ollama / Claude API) para generar narrativas forenses a partir de evidencias
+en logs, detectar patrones complejos multi-log con razonamiento semántico, y
+producir informes de análisis post-incidente en lenguaje natural. Su coste
+temporal (consultas LLM) lo hace adecuado para análisis posteriores al
+incidente, no para detección en tiempo real.
+
+En flujos de trabajo típicos: vamp-log-hunter (detección rápida) →
+vamp-log-analyzer (análisis narrativo post-incidente de los hallazgos).
 """
 
 from __future__ import annotations
@@ -103,7 +129,7 @@ from vampsec_report import (
 # Metadatos de la herramienta
 # ---------------------------------------------------------------------------
 
-VERSION   = "1.1"
+VERSION   = "1.3"
 TOOL_NAME = "vamp-log-hunter"
 AUTHOR    = "© VampSecure Studios — VampSecure Labs Security Research Division"
 
@@ -465,6 +491,7 @@ class IoCFinding:
     evidence_lines : List[str]
     remediation    : str
     tags           : List[str] = field(default_factory=list)
+    triage         : bool      = False  # True si fue generado por run_fast_triage()
 
 
 # ---------------------------------------------------------------------------
@@ -1504,7 +1531,7 @@ def _print_banner(console: Console) -> None:
         " \\ V / _ \\| |\\/| |  _/\\__ \\ _| (__| |_| |   / _|| |__ / _ \\| _ \\__ \\\n"
         "  \\_/_/ \\_\\_|  |_|_|  |___/___\\___|\\___/|_|_\\___|____/_/ \\_\\___/___/\n"
         '  by Antonio Hernandez "Belky" — VampSecure Studios\n'
-        "  vamp-log-hunter v1.1 · Cazador de IoC en Logs\n"
+        "  vamp-log-hunter v1.3 · Cazador de IoC en Logs\n"
         "  ────────────────────────────────────────────────────────────────────────\n"
         "  USO EXCLUSIVO EN AUDITORÍAS AUTORIZADAS · El uso no autorizado es ilegal\n"
     )
@@ -1516,6 +1543,7 @@ def _print_summary(
     console: Console,
     findings: List[IoCFinding],
     scanner: LogScanner,
+    max_ips: int = 10,
 ) -> None:
     """Muestra tabla de estadísticas de escaneo y distribución de hallazgos."""
     console.print(Rule("[bold]Estadísticas de análisis[/]", style="dim"))
@@ -1557,8 +1585,8 @@ def _print_summary(
             ip_counts[ip] += f.event_count
 
     if ip_counts:
-        top_ips = sorted(ip_counts.items(), key=lambda x: x[1], reverse=True)[:10]
-        ip_tbl = Table(box=box.ROUNDED, border_style="dim", title="Top IPs Ofensivas")
+        top_ips = sorted(ip_counts.items(), key=lambda x: x[1], reverse=True)[:max_ips]
+        ip_tbl = Table(box=box.ROUNDED, border_style="dim", title=f"Top IPs Ofensivas (máx. {max_ips})")
         ip_tbl.add_column("IP Origen",          style="cyan")
         ip_tbl.add_column("Eventos totales",     justify="right")
         ip_tbl.add_column("Escáner conocido",    justify="center")
@@ -2093,6 +2121,123 @@ def _apply_enrichment_to_findings(
                     finding.tags.append(tag)
 
 
+def run_fast_triage(log_dir: str) -> List[IoCFinding]:
+    """
+    Modo triaje rápido: analiza solo las últimas 1000 líneas de cada log
+    en busca de los IoC más críticos (fuerza bruta, SQLi, webshell,
+    escalada de privilegios). Objetivo: completar en menos de 5 segundos.
+
+    A diferencia del análisis completo (LogScanner), este modo:
+      - Lee solo las últimas 1000 líneas de cada fichero (no carga el fichero
+        completo en memoria).
+      - Aplica únicamente los patrones más críticos (brute_ssh, sqli,
+        webshell, priv_esc) para minimizar el tiempo de ejecución.
+      - No realiza correlación temporal entre eventos.
+      - Marca todos los hallazgos con triage=True para distinguirlos de los
+        hallazgos de un análisis completo.
+
+    Parámetros
+    ----------
+    log_dir : Directorio raíz de logs a escanear (p.ej. '/var/log').
+
+    Retorna
+    -------
+    List[IoCFinding] con los hallazgos detectados, todos con triage=True.
+    """
+    # Patrones críticos a aplicar en modo rápido
+    _PATRONES_CRITICOS = {
+        "brute_ssh":  _RE_SSH_FAIL,
+        "sqli":       _RE_SQLI,
+        "webshell":   _RE_WEBSHELL_PATH,
+        "priv_esc":   _RE_SUDO_OPEN,
+    }
+
+    # Categorías con sus datos de hallazgo
+    _META_CRITICA = {
+        "brute_ssh": {
+            "id": "LOG-001", "severity": "CRITICAL",
+            "title": "[TRIAJE] Intentos de fuerza bruta SSH detectados",
+            "remediation": "Revisar /etc/ssh/sshd_config, habilitar fail2ban y restringir acceso SSH por IP.",
+        },
+        "sqli": {
+            "id": "LOG-004", "severity": "CRITICAL",
+            "title": "[TRIAJE] Indicios de inyección SQL en peticiones HTTP",
+            "remediation": "Revisar WAF, parametrizar consultas, analizar logs de base de datos.",
+        },
+        "webshell": {
+            "id": "LOG-007", "severity": "CRITICAL",
+            "title": "[TRIAJE] Posible webshell o shell remota detectada",
+            "remediation": "Auditar directorio web, buscar ficheros PHP/JSP recientes, aislar servidor.",
+        },
+        "priv_esc": {
+            "id": "LOG-010", "severity": "HIGH",
+            "title": "[TRIAJE] Escalada de privilegios sudo detectada",
+            "remediation": "Revisar sudoers, auditar comandos ejecutados con sudo, verificar integridad de binarios.",
+        },
+    }
+
+    ficheros = _discover_log_files(log_dir)
+    if not ficheros:
+        return []
+
+    # Acumular líneas de evidencia y IPs por categoría
+    evidencias: Dict[str, List[str]] = {k: [] for k in _PATRONES_CRITICOS}
+    ips:        Dict[str, List[str]] = {k: [] for k in _PATRONES_CRITICOS}
+
+    for ruta, _tipo in ficheros:
+        # Leer solo las últimas 1000 líneas del fichero (eficiente en memoria)
+        try:
+            with open(ruta, "r", encoding="utf-8", errors="replace") as fh:
+                lineas = fh.readlines()
+            cola = lineas[-1000:] if len(lineas) > 1000 else lineas
+        except (OSError, IOError):
+            continue
+
+        for linea in cola:
+            linea_stripped = linea.strip()
+            if not linea_stripped:
+                continue
+
+            for categoria, patron in _PATRONES_CRITICOS.items():
+                if patron.search(linea_stripped):
+                    if len(evidencias[categoria]) < 10:
+                        evidencias[categoria].append(linea_stripped[:400])
+                    # Extraer IP si está disponible
+                    m_ip = _RE_SSH_SRC_IP.search(linea_stripped)
+                    if m_ip:
+                        ip = m_ip.group(1)
+                        if ip not in ips[categoria]:
+                            ips[categoria].append(ip)
+                    break  # una línea puede disparar una sola categoría en triaje
+
+    # Construir hallazgos
+    hallazgos: List[IoCFinding] = []
+    for categoria, evidencia_lista in evidencias.items():
+        if not evidencia_lista:
+            continue
+        meta = _META_CRITICA[categoria]
+        hallazgos.append(IoCFinding(
+            id             = meta["id"],
+            severity       = meta["severity"],
+            category       = categoria,
+            title          = meta["title"],
+            description    = (
+                f"Triaje rápido (últimas 1000 líneas de {len(ficheros)} fichero(s)): "
+                f"{len(evidencia_lista)} línea(s) con indicios de {categoria.replace('_', ' ')}."
+            ),
+            source_ips     = ips[categoria][:10],
+            event_count    = len(evidencia_lista),
+            first_seen     = None,
+            last_seen      = None,
+            evidence_lines = evidencia_lista,
+            remediation    = meta["remediation"],
+            tags           = ["fast-triage"],
+            triage         = True,
+        ))
+
+    return hallazgos
+
+
 def main() -> int:
     """
     Punto de entrada principal de vamp-log-hunter.
@@ -2150,6 +2295,19 @@ def main() -> int:
         "--threshold-scan", metavar="INT", type=int, default=20,
         help="Umbral de rutas únicas con 404 para escaneo de directorios (por defecto: 20)",
     )
+    ag.add_argument(
+        "--max-ips", metavar="N", type=int, default=10, dest="max_ips",
+        help="Máximo de IPs a mostrar en el resumen de atacantes (default: 10)",
+    )
+    ag.add_argument(
+        "--fast-mode", action="store_true", dest="fast_mode",
+        help=(
+            "Modo triaje rápido (<5 s): analiza solo las últimas 1000 líneas "
+            "de cada log y aplica únicamente los IoC más críticos (brute_ssh, "
+            "sqli, webshell, priv_esc). Sin correlación temporal. Ideal para "
+            "una primera inspección rápida antes del análisis completo."
+        ),
+    )
 
     # ── Grupo de enriquecimiento con feeds de amenazas ────────────────────
     ti = parser.add_argument_group("Threat Intelligence (enriquecimiento de IPs)")
@@ -2188,6 +2346,27 @@ def main() -> int:
 
     console = Console()
     _print_banner(console)
+
+    # ── Modo triaje rápido (--fast-mode) ──────────────────────────────────
+    if getattr(args, "fast_mode", False):
+        console.print("[bold yellow]⚡ MODO TRIAJE RÁPIDO — últimas 1000 líneas · solo IoC críticos[/]")
+        triage_findings = run_fast_triage(args.log_dir)
+        if not triage_findings:
+            console.print("[green]✓[/]  Triaje rápido completado sin hallazgos críticos.")
+            return 0
+        _print_findings(console, triage_findings)
+        console.print(
+            f"\n[bold yellow]⚡ Triaje completado: {len(triage_findings)} hallazgo(s). "
+            "Ejecuta sin --fast-mode para análisis completo.[/]"
+        )
+        if args.json:
+            _save_json(triage_findings, args.json)
+            console.print(f"[green]✓[/]  Informe JSON guardado en: {args.json}")
+        if any(f.severity == "CRITICAL" for f in triage_findings):
+            return 2
+        if any(f.severity == "HIGH" for f in triage_findings):
+            return 1
+        return 0
 
     # ── Construcción de la lista de ficheros a analizar ───────────────────
     files_to_scan: List[Tuple[str, str]] = []
@@ -2274,7 +2453,7 @@ def main() -> int:
             else:
                 console.print("[dim]  --enrich-ips: no hay IPs que enriquecer.[/]")
 
-    _print_summary(console, findings, scanner)
+    _print_summary(console, findings, scanner, max_ips=args.max_ips)
     _print_findings(console, findings)
 
     # ── Exportaciones ─────────────────────────────────────────────────────
