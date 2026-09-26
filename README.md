@@ -1,3 +1,4 @@
+<!-- © VampSecure Studios — VampSecure Labs Security Research Division -->
 <h1 align="center">vamp-log-hunter</h1>
 <p align="center">
   <strong>Forensic log analyzer that detects Indicators of Compromise across 14 attack categories</strong><br>
@@ -45,6 +46,13 @@ pip install -r requirements.txt
 Standard library: `argparse`, `gzip`, `ipaddress`, `json`, `re`, `sys`, `collections`, `datetime`, `pathlib`.
 
 ## Installation
+
+
+```bash
+pip install vamp-log-hunter
+# o con Homebrew:
+brew install vampsecure-labs/labs/vamp-log-hunter
+```
 
 ```bash
 git clone https://github.com/belky-me/vamp-log-hunter.git
@@ -142,3 +150,8 @@ This tool is part of the **VampSecure Labs Security Toolkit** — a collection o
 
 © VampSecure Studios — VampSecure Labs Security Research Division  
 For authorized security testing only.
+
+---
+
+## Versión
+v1.2 — VampSecure Labs Security Research Division
