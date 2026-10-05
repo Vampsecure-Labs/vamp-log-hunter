@@ -10,6 +10,7 @@
   <img src="https://img.shields.io/badge/platform-linux%20%7C%20macos-lightgrey?style=flat-square">
   <img src="https://img.shields.io/badge/license-research%20only-red?style=flat-square">
   <img src="https://img.shields.io/badge/VampSecure-Labs-8B0000?style=flat-square">
+  <img src="https://github.com/Vampsecure-Labs/vamp-log-hunter/actions/workflows/ci.yml/badge.svg" alt="CI"/>
 </p>
 
 ---
