@@ -96,10 +96,10 @@ import os
 import re
 import sys
 from collections import defaultdict
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Dict, Iterator, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 # Rich (visualización en terminal)
 from rich.console import Console
@@ -1749,7 +1749,7 @@ def _save_html(findings: List[IoCFinding], path: str) -> None:
         css    = _SEV_CSS.get(f.severity, "#888")
         ips_s  = ", ".join(f.source_ips[:5]) or "—"
         tags_s = (
-            f'<div class="tags">'
+            '<div class="tags">'
             + "".join(f'<span class="tag">{_e(t)}</span>' for t in f.tags)
             + '</div>'
         ) if f.tags else ""
