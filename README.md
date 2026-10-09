@@ -13,15 +13,18 @@
   <img src="https://github.com/Vampsecure-Labs/vamp-log-hunter/actions/workflows/ci.yml/badge.svg" alt="CI"/>
 </p>
 
+> 🇬🇧 [English](#english) · 🇪🇸 [Español](#español)
+
 ---
 
-## Overview
+<a name="english"></a>
+## 🇬🇧 English
 
 `vamp-log-hunter` is a forensic log analysis tool for detecting Indicators of Compromise (IoC) in system logs. It processes nginx, Apache, `auth.log`, syslog, and journald logs line-by-line — without loading full files into memory — and correlates events across 14 attack categories ranging from SSH brute force and SQL injection to webshell access and anomalous nocturnal activity. Each finding carries remediation steps and structured evidence lines ready for inclusion in client security reports.
 
 Built-in threat intelligence covers known scanner IP ranges (Shodan, Censys, GreyNoise, Tor exit nodes) and automatically tags findings whose source IPs match those ranges.
 
-## Features
+### Features
 
 - **14 IoC categories**: SSH brute force, web brute force (4xx flood), directory scanning, SQL injection, XSS, path traversal / LFI, webshell access, sensitive file enumeration (`.env`, `.git`, `wp-config`, etc.), scanner User-Agent detection, `sudo`/`su` privilege escalation, suspicious cron jobs, direct root SSH login, known-scanner IP correlation, and anomalous nocturnal traffic (02:00–05:59)
 - **Known-scanner intelligence**: built-in IP and CIDR database for Shodan, Censys, GreyNoise, SecurityTrails, Masscan, and Tor exit nodes — findings from those sources are automatically labelled
@@ -34,7 +37,7 @@ Built-in threat intelligence covers known scanner IP ranges (Shodan, Censys, Gre
 - **Unified VSL client report** (HTML/PDF) via `--report-html` / `--report-pdf` flags
 - Rich console output with color-coded severity panels and a top-IPs summary table
 
-## Requirements
+### Requirements
 
 ```
 pip install -r requirements.txt
@@ -46,22 +49,21 @@ pip install -r requirements.txt
 
 Standard library: `argparse`, `gzip`, `ipaddress`, `json`, `re`, `sys`, `collections`, `datetime`, `pathlib`.
 
-## Installation
-
+### Installation
 
 ```bash
 pip install vamp-log-hunter
-# o con Homebrew:
+# or with Homebrew:
 brew install vampsecure-labs/labs/vamp-log-hunter
 ```
 
 ```bash
-git clone https://github.com/belky-me/vamp-log-hunter.git
+git clone https://github.com/Vampsecure-Labs/vamp-log-hunter.git
 cd vamp-log-hunter
 pip install -r requirements.txt
 ```
 
-## Usage
+### Usage
 
 ```bash
 python vamp_log_hunter.py --help
@@ -73,7 +75,7 @@ usage: vamp_log_hunter.py [-h] [--file FILE] [--log-type {nginx,apache,auth,sysl
                            [--threshold-scan N] [--json FILE] [--html FILE] [-v]
 ```
 
-### Examples
+#### Examples
 
 **Scan all logs in `/var/log` (auto-discovery):**
 ```bash
@@ -106,7 +108,7 @@ cat /var/log/nginx/access.log | python vamp_log_hunter.py --file -
 python vamp_log_hunter.py --file /var/log/nginx/access.log.1.gz
 ```
 
-## IoC Category Reference
+### IoC Category Reference
 
 | ID | Category | Log Source |
 |----|----------|-----------|
@@ -125,7 +127,7 @@ python vamp_log_hunter.py --file /var/log/nginx/access.log.1.gz
 | LOG-013 | Known-scanner IP | nginx / apache |
 | LOG-014 | Anomalous nocturnal activity (02:00–05:59) | nginx / apache / auth |
 
-## Output Formats
+### Output Formats
 
 | Format | Flag | Description |
 |--------|------|-------------|
@@ -133,17 +135,17 @@ python vamp_log_hunter.py --file /var/log/nginx/access.log.1.gz
 | JSON | `--json FILE` | Full structured export with all finding fields |
 | HTML | `--html FILE` | Standalone dark-theme report with KPI bar and finding cards |
 
-## Exit Codes
+### Exit Codes
 
 | Code | Meaning |
 |------|---------|
 | `0` | No IoC found |
 | `1` | One or more IoC findings detected |
 
-## Sample Output
+### Sample Output
 
 ```
-  vamp-log-hunter v1.2 · scanning /var/log/ (5 sources, 248 MB)
+  vamp-log-hunter v1.3 · scanning /var/log/ (5 sources, 248 MB)
   ──────────────────────────────────────────────────────────────
   [+] nginx/access.log · auth.log · syslog parsed in 4.1s
 
@@ -172,7 +174,7 @@ python vamp_log_hunter.py --file /var/log/nginx/access.log.1.gz
   Total: 7 findings · 14 categories scanned
 ```
 
-## Why vamp-log-hunter vs. Fail2ban · GoAccess · CrowdSec
+### Why vamp-log-hunter vs. Fail2ban · GoAccess · CrowdSec
 
 | Feature | vamp-log-hunter | Fail2ban | GoAccess | CrowdSec |
 |---------|:---------------:|:--------:|:--------:|:--------:|
@@ -190,7 +192,7 @@ python vamp_log_hunter.py --file /var/log/nginx/access.log.1.gz
 - **14 correlated categories in one pass.** GoAccess gives you traffic statistics. vamp-log-hunter gives you an attacker story: SQL injection origin, webshell probe at 03:14, root SSH login at 03:26 — correlated across nginx, auth.log, and syslog simultaneously.
 - **Report-ready output.** Every finding ships with severity, ATT&CK mapping, evidence lines, timestamps, and remediation text — structured to paste directly into a penetration-test or incident-response report.
 
-## Check Coverage
+### Check Coverage
 
 | Check ID | Description | Standard | Severity |
 |----------|-------------|----------|----------|
@@ -208,12 +210,18 @@ python vamp_log_hunter.py --file /var/log/nginx/access.log.1.gz
 | LOG-013 | Source IP matches known scanner range (Shodan, Censys, Tor exit) | MITRE T1595 | MEDIUM |
 | LOG-014 | Anomalous nocturnal activity: auth or web events at 02:00–05:59 | MITRE T1078 | MEDIUM |
 
-## Part of VampSecure Labs Toolkit
+### Part of VampSecure Labs Toolkit
 
 This tool is part of the **VampSecure Labs Security Toolkit** — a collection of research-grade security tools for authorized penetration testing and red/blue team exercises.
 
-- Full toolkit: [github.com/belky-me](https://github.com/belky-me)
-- Orchestrator: [github.com/belky-me/vamp-orchestrator](https://github.com/belky-me/vamp-orchestrator)
+- Full toolkit: [github.com/Vampsecure-Labs](https://github.com/Vampsecure-Labs)
+
+### Version History
+
+| Version | Main changes |
+|---------|-------------|
+| v1.3 | Bilingual README (EN/ES) |
+| v1.2 | 14 IoC categories, known-scanner IP intelligence, dark-theme HTML report |
 
 ---
 
@@ -221,6 +229,172 @@ This tool is part of the **VampSecure Labs Security Toolkit** — a collection o
 For authorized security testing only.
 
 ---
+---
 
-## Versión
-v1.2 — VampSecure Labs Security Research Division
+<a name="español"></a>
+## 🇪🇸 Español
+
+`vamp-log-hunter` es una herramienta de análisis forense de logs para detectar Indicadores de Compromiso (IoC) en logs del sistema. Procesa logs de nginx, Apache, `auth.log`, syslog y journald línea a línea —sin cargar ficheros completos en memoria— y correlaciona eventos en 14 categorías de ataque, desde fuerza bruta SSH e inyección SQL hasta acceso a webshells y actividad nocturna anómala. Cada hallazgo incluye pasos de remediación y líneas de evidencia estructuradas listas para incluir en informes de seguridad para clientes.
+
+La inteligencia de amenazas integrada cubre rangos de IP de escáneres conocidos (Shodan, Censys, GreyNoise, nodos de salida Tor) y etiqueta automáticamente los hallazgos cuyas IPs de origen coincidan con esos rangos.
+
+### Características
+
+- **14 categorías de IoC**: fuerza bruta SSH, fuerza bruta web (flood 4xx), escaneo de directorios, inyección SQL, XSS, path traversal / LFI, acceso a webshells, enumeración de ficheros sensibles (`.env`, `.git`, `wp-config`, etc.), detección de User-Agent de escáner, escalada de privilegios `sudo`/`su`, cron jobs sospechosos, login directo como root SSH, correlación de IPs de escáneres conocidos y tráfico nocturno anómalo (02:00–05:59)
+- **Inteligencia de escáneres conocidos**: base de datos integrada de IPs y CIDRs de Shodan, Censys, GreyNoise, SecurityTrails, Masscan y nodos de salida Tor — los hallazgos de esas fuentes se etiquetan automáticamente
+- **Soporte multi-formato de logs**: Combined Log Format nginx/Apache, syslog, auth.log (`.log.gz` comprimido gzip tratado de forma transparente); pipe stdin vía `--file -`
+- **Umbrales configurables** para conteo de eventos de fuerza bruta (`--threshold-brute`) y conteo de rutas en escaneo de directorios (`--threshold-scan`)
+- **Filtrado por ventana de tiempo** con `--last-hours` para centrarse en eventos recientes sin reprocesar logs completos
+- **Tabla de IPs ofensivas top** que resume el conteo total de eventos por fuente con etiqueta de escáner
+- **Exportación JSON** — esquema estructurado con metadatos completos de hallazgos: severidad, categoría, IPs de origen, timestamps de primera/última aparición, líneas de evidencia y remediación
+- **Informe HTML dark-theme standalone** — sin dependencias CDN; barra de resumen KPI + tabla de hallazgos ordenable + tarjetas expandibles detalladas
+- **Informe unificado VSL para cliente** (HTML/PDF) vía flags `--report-html` / `--report-pdf`
+- Salida enriquecida en consola con paneles de severidad con código de colores y tabla resumen de IPs top
+
+### Requisitos
+
+```
+pip install -r requirements.txt
+```
+
+| Paquete | Versión |
+|---------|---------|
+| `rich`  | >= 13.7.0 |
+
+Librería estándar: `argparse`, `gzip`, `ipaddress`, `json`, `re`, `sys`, `collections`, `datetime`, `pathlib`.
+
+### Instalación
+
+```bash
+pip install vamp-log-hunter
+# o con Homebrew:
+brew install vampsecure-labs/labs/vamp-log-hunter
+```
+
+```bash
+git clone https://github.com/Vampsecure-Labs/vamp-log-hunter.git
+cd vamp-log-hunter
+pip install -r requirements.txt
+```
+
+### Uso
+
+```bash
+python vamp_log_hunter.py --help
+```
+
+#### Ejemplos
+
+**Escanear todos los logs en `/var/log` (auto-descubrimiento):**
+```bash
+python vamp_log_hunter.py
+```
+
+**Analizar ficheros de log específicos:**
+```bash
+python vamp_log_hunter.py --file /var/log/nginx/access.log \
+                           --file /var/log/auth.log
+```
+
+**Centrarse en las últimas 24 horas, reducir umbral de fuerza bruta a 5 eventos:**
+```bash
+python vamp_log_hunter.py --last-hours 24 --threshold-brute 5
+```
+
+**Exportar JSON e informe HTML dark-theme standalone:**
+```bash
+python vamp_log_hunter.py --json report.json --html report.html
+```
+
+**Leer desde stdin (pipe):**
+```bash
+cat /var/log/nginx/access.log | python vamp_log_hunter.py --file -
+```
+
+**Analizar un log rotado comprimido con gzip:**
+```bash
+python vamp_log_hunter.py --file /var/log/nginx/access.log.1.gz
+```
+
+### Referencia de categorías IoC
+
+| ID | Categoría | Fuente de log |
+|----|-----------|---------------|
+| LOG-001 | Fuerza bruta SSH | auth.log / syslog |
+| LOG-002 | Fuerza bruta web (flood 4xx) | nginx / apache |
+| LOG-003 | Enumeración de directorios (404 únicos) | nginx / apache |
+| LOG-004 | Inyección SQL en URI | nginx / apache |
+| LOG-005 | Payload XSS en URI | nginx / apache |
+| LOG-006 | Path traversal / LFI | nginx / apache |
+| LOG-007 | Acceso a webshell o parámetro RCE | nginx / apache |
+| LOG-008 | Acceso a fichero sensible | nginx / apache |
+| LOG-009 | User-Agent de escáner | nginx / apache |
+| LOG-010 | Escalada de privilegios sudo / su | auth.log / syslog |
+| LOG-011 | Comandos sospechosos en cron job | syslog |
+| LOG-012 | Login SSH directo como root | auth.log |
+| LOG-013 | IP de escáner conocido | nginx / apache |
+| LOG-014 | Actividad nocturna anómala (02:00–05:59) | nginx / apache / auth |
+
+### Formatos de salida
+
+| Formato | Flag | Descripción |
+|---------|------|-------------|
+| Consola (Rich) | _(predeterminado)_ | Paneles ordenados por severidad con evidencia, IPs, timestamps y remediación |
+| JSON | `--json FILE` | Exportación estructurada completa con todos los campos del hallazgo |
+| HTML | `--html FILE` | Informe dark-theme standalone con barra KPI y tarjetas de hallazgos |
+
+### Códigos de salida
+
+| Código | Significado |
+|--------|-------------|
+| `0` | Sin IoC encontrados |
+| `1` | Uno o más hallazgos de IoC detectados |
+
+### Por qué vamp-log-hunter vs. Fail2ban · GoAccess · CrowdSec
+
+| Feature | vamp-log-hunter | Fail2ban | GoAccess | CrowdSec |
+|---------|:---------------:|:--------:|:--------:|:--------:|
+| Detección forense de IoC en 14 categorías | ✅ | ❌ | ❌ | ❌ |
+| Exportación JSON estructurada con líneas de evidencia | ✅ | ❌ | ✅ | ✅ |
+| Inteligencia de IP de escáneres conocidos (Shodan, Tor, Censys) | ✅ | ❌ | ❌ | ✅ |
+| Operación offline / air-gapped | ✅ | ✅ | ✅ | ❌ |
+| Informe HTML dark-theme standalone | ✅ | ❌ | ✅ | ❌ |
+| Lee logs rotados comprimidos (.log.gz) | ✅ | ❌ | ✅ | ❌ |
+| Pasos de remediación por hallazgo | ✅ | ❌ | ❌ | ❌ |
+| Correlación multi-categoría sin daemon/agente | ✅ | ❌ | ❌ | ❌ |
+
+### Cobertura de checks
+
+| Check ID | Descripción | Estándar | Severidad |
+|----------|-------------|----------|-----------|
+| LOG-001 | Fuerza bruta SSH: autenticaciones fallidas repetidas en sshd | MITRE T1110.001 | HIGH |
+| LOG-002 | Fuerza bruta web: flood 4xx desde fuente única en ventana corta | MITRE T1110 | HIGH |
+| LOG-003 | Enumeración de directorios: alto conteo de 404 únicos (path fuzzing) | MITRE T1083 | MEDIUM |
+| LOG-004 | Patrones de inyección SQL en URI o cuerpo POST de la petición | OWASP A03:2021 · MITRE T1190 | CRITICAL |
+| LOG-005 | Payload XSS detectado en parámetros URI | OWASP A03:2021 | HIGH |
+| LOG-006 | Path traversal / LFI: secuencias `../` o `/etc/passwd` en URI | OWASP A01:2021 · MITRE T1083 | HIGH |
+| LOG-007 | Acceso a webshell o parámetro estilo RCE en petición web | MITRE T1505.003 | CRITICAL |
+| LOG-008 | Sondeo de ficheros sensibles: `.env`, `.git`, `wp-config`, claves privadas | MITRE T1083 | HIGH |
+| LOG-009 | Huella digital de User-Agent de escáner (sqlmap, nikto, nmap, gobuster…) | MITRE T1595 | MEDIUM |
+| LOG-010 | Escalada de privilegios sudo / su con comandos sospechosos | MITRE T1548.003 | HIGH |
+| LOG-012 | Login SSH directo como root (bypass PermitRootLogin) | MITRE T1078.003 | HIGH |
+| LOG-013 | IP de origen coincide con rango de escáner conocido (Shodan, Censys, Tor exit) | MITRE T1595 | MEDIUM |
+| LOG-014 | Actividad nocturna anómala: eventos de auth o web entre 02:00–05:59 | MITRE T1078 | MEDIUM |
+
+### Parte del toolkit VampSecure Labs
+
+Esta herramienta es parte del **Toolkit de Seguridad de VampSecure Labs** — una colección de herramientas de seguridad de grado investigación para pruebas de penetración autorizadas y ejercicios red/blue team.
+
+- Portfolio completo: [github.com/Vampsecure-Labs](https://github.com/Vampsecure-Labs)
+
+### Historial de versiones
+
+| Versión | Cambios principales |
+|---------|---------------------|
+| v1.3 | README bilingüe (EN/ES) |
+| v1.2 | 14 categorías IoC, inteligencia de IPs de escáneres conocidos, informe HTML dark-theme |
+
+---
+
+© VampSecure Studios — VampSecure Labs Security Research Division  
+Solo para pruebas de seguridad autorizadas.
