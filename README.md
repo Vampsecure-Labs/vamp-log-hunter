@@ -145,7 +145,7 @@ python vamp_log_hunter.py --file /var/log/nginx/access.log.1.gz
 ### Sample Output
 
 ```
-  vamp-log-hunter v1.3 · scanning /var/log/ (5 sources, 248 MB)
+  vamp-log-hunter v1.4 · scanning /var/log/ (5 sources, 248 MB)
   ──────────────────────────────────────────────────────────────
   [+] nginx/access.log · auth.log · syslog parsed in 4.1s
 
@@ -186,6 +186,7 @@ python vamp_log_hunter.py --file /var/log/nginx/access.log.1.gz
 | Reads compressed (.log.gz) rotated logs | ✅ | ❌ | ✅ | ❌ |
 | Remediation steps per finding | ✅ | ❌ | ❌ | ❌ |
 | Multi-category correlation without daemon/agent | ✅ | ❌ | ❌ | ❌ |
+| MITRE ATT&CK technique per finding | ✅ | ❌ | ❌ | ❌ |
 
 - **Post-incident forensics vs. live blocking.** Fail2ban and CrowdSec are daemons that react in real time — they produce no forensic report, no evidence lines, and no historical re-analysis. vamp-log-hunter was designed for investigations: feed it any log file from any date and get structured findings ready for a client report.
 - **IoC intelligence baked in.** The built-in database of Shodan, Censys, GreyNoise, SecurityTrails, Masscan, and Tor exit-node CIDRs automatically labels known-scanner activity without a cloud lookup or API key.
@@ -200,12 +201,13 @@ python vamp_log_hunter.py --file /var/log/nginx/access.log.1.gz
 | LOG-002 | Web brute force: 4xx flood from single source in short window | MITRE T1110 | HIGH |
 | LOG-003 | Directory enumeration: high unique 404 count (path fuzzing) | MITRE T1083 | MEDIUM |
 | LOG-004 | SQL injection patterns in request URI or POST body | OWASP A03:2021 · MITRE T1190 | CRITICAL |
-| LOG-005 | XSS payload detected in URI parameters | OWASP A03:2021 | HIGH |
+| LOG-005 | XSS payload detected in URI parameters | OWASP A03:2021 · MITRE T1190 | HIGH |
 | LOG-006 | Path traversal / LFI: `../` sequences or `/etc/passwd` in URI | OWASP A01:2021 · MITRE T1083 | HIGH |
 | LOG-007 | Webshell access or RCE-style parameter in web request | MITRE T1505.003 | CRITICAL |
 | LOG-008 | Sensitive file probing: `.env`, `.git`, `wp-config`, private keys | MITRE T1083 | HIGH |
 | LOG-009 | Scanner User-Agent fingerprint (sqlmap, nikto, nmap, gobuster…) | MITRE T1595 | MEDIUM |
 | LOG-010 | sudo / su privilege escalation with suspicious commands | MITRE T1548.003 | HIGH |
+| LOG-011 | Suspicious cron job commands (persistence) | MITRE T1053.003 | HIGH |
 | LOG-012 | Direct root SSH login (PermitRootLogin bypass) | MITRE T1078.003 | HIGH |
 | LOG-013 | Source IP matches known scanner range (Shodan, Censys, Tor exit) | MITRE T1595 | MEDIUM |
 | LOG-014 | Anomalous nocturnal activity: auth or web events at 02:00–05:59 | MITRE T1078 | MEDIUM |
@@ -220,6 +222,7 @@ This tool is part of the **VampSecure Labs Security Toolkit** — a collection o
 
 | Version | Main changes |
 |---------|-------------|
+| v1.4 | MITRE ATT&CK technique per finding, mapped by category (`attack` field in JSON, shown in console and HTML). Completed the Check Coverage catalog (LOG-005 → T1190, LOG-011 → T1053.003). |
 | v1.3 | Bilingual README (EN/ES) |
 | v1.2 | 14 IoC categories, known-scanner IP intelligence, dark-theme HTML report |
 
@@ -362,6 +365,7 @@ python vamp_log_hunter.py --file /var/log/nginx/access.log.1.gz
 | Lee logs rotados comprimidos (.log.gz) | ✅ | ❌ | ✅ | ❌ |
 | Pasos de remediación por hallazgo | ✅ | ❌ | ❌ | ❌ |
 | Correlación multi-categoría sin daemon/agente | ✅ | ❌ | ❌ | ❌ |
+| Técnica MITRE ATT&CK por hallazgo | ✅ | ❌ | ❌ | ❌ |
 
 ### Cobertura de checks
 
@@ -371,12 +375,13 @@ python vamp_log_hunter.py --file /var/log/nginx/access.log.1.gz
 | LOG-002 | Fuerza bruta web: flood 4xx desde fuente única en ventana corta | MITRE T1110 | HIGH |
 | LOG-003 | Enumeración de directorios: alto conteo de 404 únicos (path fuzzing) | MITRE T1083 | MEDIUM |
 | LOG-004 | Patrones de inyección SQL en URI o cuerpo POST de la petición | OWASP A03:2021 · MITRE T1190 | CRITICAL |
-| LOG-005 | Payload XSS detectado en parámetros URI | OWASP A03:2021 | HIGH |
+| LOG-005 | Payload XSS detectado en parámetros URI | OWASP A03:2021 · MITRE T1190 | HIGH |
 | LOG-006 | Path traversal / LFI: secuencias `../` o `/etc/passwd` en URI | OWASP A01:2021 · MITRE T1083 | HIGH |
 | LOG-007 | Acceso a webshell o parámetro estilo RCE en petición web | MITRE T1505.003 | CRITICAL |
 | LOG-008 | Sondeo de ficheros sensibles: `.env`, `.git`, `wp-config`, claves privadas | MITRE T1083 | HIGH |
 | LOG-009 | Huella digital de User-Agent de escáner (sqlmap, nikto, nmap, gobuster…) | MITRE T1595 | MEDIUM |
 | LOG-010 | Escalada de privilegios sudo / su con comandos sospechosos | MITRE T1548.003 | HIGH |
+| LOG-011 | Comandos sospechosos en cron job (persistencia) | MITRE T1053.003 | HIGH |
 | LOG-012 | Login SSH directo como root (bypass PermitRootLogin) | MITRE T1078.003 | HIGH |
 | LOG-013 | IP de origen coincide con rango de escáner conocido (Shodan, Censys, Tor exit) | MITRE T1595 | MEDIUM |
 | LOG-014 | Actividad nocturna anómala: eventos de auth o web entre 02:00–05:59 | MITRE T1078 | MEDIUM |
@@ -391,6 +396,7 @@ Esta herramienta es parte del **Toolkit de Seguridad de VampSecure Labs** — un
 
 | Versión | Cambios principales |
 |---------|---------------------|
+| v1.4 | Técnica MITRE ATT&CK por hallazgo, mapeada por categoría (campo `attack` en JSON, mostrada en consola y HTML). Catálogo de cobertura completado (LOG-005 → T1190, LOG-011 → T1053.003). |
 | v1.3 | README bilingüe (EN/ES) |
 | v1.2 | 14 categorías IoC, inteligencia de IPs de escáneres conocidos, informe HTML dark-theme |
 

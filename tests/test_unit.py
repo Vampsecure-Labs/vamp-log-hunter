@@ -466,3 +466,57 @@ class TestIoCFindingDataclass:
             evidence_lines=[], remediation="",
         )
         assert hallazgo.tags == []
+
+
+# ---------------------------------------------------------------------------
+# Mapeo MITRE ATT&CK por categoría (v1.4)
+# ---------------------------------------------------------------------------
+
+class TestAttackMapping:
+    """Verifica que cada hallazgo recibe su técnica MITRE ATT&CK por categoría."""
+
+    def _f(self, category):
+        return IoCFinding(
+            id="LOG-001", severity="HIGH", category=category, title="t",
+            description="d", source_ips=[], event_count=1,
+            first_seen=None, last_seen=None, evidence_lines=[], remediation="r",
+        )
+
+    def test_attach_attack_por_categoria(self):
+        from vamp_log_hunter import _attach_attack, ATTACK_BY_CATEGORY
+        casos = {
+            "brute_ssh": "T1110.001",
+            "webshell": "T1505.003",
+            "suspicious_cron": "T1053.003",
+            "root_login": "T1078.003",
+            "scanner_ua": "T1595",
+        }
+        fs = [self._f(c) for c in casos]
+        _attach_attack(fs)
+        for f in fs:
+            assert f.attack == casos[f.category]
+
+    def test_todas_las_categorias_tienen_tecnica(self):
+        from vamp_log_hunter import ATTACK_BY_CATEGORY
+        categorias = {
+            "brute_ssh", "brute_web", "dir_scan", "sqli", "xss", "lfi",
+            "webshell", "sensitive_files", "scanner_ua", "priv_escalation",
+            "suspicious_cron", "root_login", "known_scanner",
+            "night_anomaly", "night_anomaly_ssh",
+        }
+        faltan = categorias - set(ATTACK_BY_CATEGORY)
+        assert not faltan, f"categorías sin técnica ATT&CK: {faltan}"
+
+    def test_attack_en_json(self, tmp_path):
+        from vamp_log_hunter import _attach_attack, _save_json
+        import json
+        fs = [self._f("sqli")]
+        _attach_attack(fs)
+        out = tmp_path / "r.json"
+        _save_json(fs, str(out))
+        data = json.loads(out.read_text())
+        assert data["findings"][0]["attack"] == "T1190"
+
+    def test_version_1_4(self):
+        from vamp_log_hunter import VERSION
+        assert VERSION == "1.4"

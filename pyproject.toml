@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vamp-log-hunter"
-version = "1.3"
+version = "1.4"
 description = "Log hunting and threat-pattern scanner for authorized security assessments, with fast-mode triage"
 readme = "README.md"
 license = { text = "AGPL-3.0-only" }

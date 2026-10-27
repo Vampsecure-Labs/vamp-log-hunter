@@ -129,7 +129,7 @@ from vampsec_report import (
 # Metadatos de la herramienta
 # ---------------------------------------------------------------------------
 
-VERSION   = "1.3"
+VERSION   = "1.4"
 TOOL_NAME = "vamp-log-hunter"
 AUTHOR    = "© VampSecure Studios — VampSecure Labs Security Research Division"
 
@@ -492,6 +492,40 @@ class IoCFinding:
     remediation    : str
     tags           : List[str] = field(default_factory=list)
     triage         : bool      = False  # True si fue generado por run_fast_triage()
+    attack         : str       = ""     # Técnica MITRE ATT&CK (p.ej. "T1110.001"), por categoría
+
+
+# ---------------------------------------------------------------------------
+# Mapeo MITRE ATT&CK por categoría de hallazgo
+# ---------------------------------------------------------------------------
+# Cada categoría detectada se asocia a su técnica MITRE ATT&CK (Enterprise).
+# Se asigna por `category` (clave estable), no por `id` (que es secuencial por
+# ejecución). Fuente de la taxonomía: tabla "Check Coverage" del README.
+ATTACK_BY_CATEGORY: Dict[str, str] = {
+    "brute_ssh":         "T1110.001",   # Brute Force: Password Guessing
+    "brute_web":         "T1110",       # Brute Force
+    "dir_scan":          "T1083",       # File and Directory Discovery
+    "sqli":              "T1190",       # Exploit Public-Facing Application
+    "xss":               "T1190",       # Exploit Public-Facing Application
+    "lfi":               "T1083",       # File and Directory Discovery
+    "webshell":          "T1505.003",   # Server Software Component: Web Shell
+    "sensitive_files":   "T1083",       # File and Directory Discovery
+    "scanner_ua":        "T1595",       # Active Scanning
+    "priv_escalation":   "T1548.003",   # Abuse Elevation Control: Sudo and Sudo Caching
+    "priv_esc":          "T1548.003",   # (alias usado por el triaje rápido)
+    "suspicious_cron":   "T1053.003",   # Scheduled Task/Job: Cron
+    "root_login":        "T1078.003",   # Valid Accounts: Local Accounts
+    "known_scanner":     "T1595",       # Active Scanning
+    "night_anomaly":     "T1078",       # Valid Accounts
+    "night_anomaly_ssh": "T1078",       # Valid Accounts
+}
+
+
+def _attach_attack(findings: List[IoCFinding]) -> None:
+    """Asigna a cada hallazgo su técnica MITRE ATT&CK según su categoría."""
+    for f in findings:
+        if not f.attack:
+            f.attack = ATTACK_BY_CATEGORY.get(f.category, "")
 
 
 # ---------------------------------------------------------------------------
@@ -1531,7 +1565,7 @@ def _print_banner(console: Console) -> None:
         " \\ V / _ \\| |\\/| |  _/\\__ \\ _| (__| |_| |   / _|| |__ / _ \\| _ \\__ \\\n"
         "  \\_/_/ \\_\\_|  |_|_|  |___/___\\___|\\___/|_|_\\___|____/_/ \\_\\___/___/\n"
         '  by Antonio Hernandez "Belky" — VampSecure Studios\n'
-        "  vamp-log-hunter v1.3 · Cazador de IoC en Logs\n"
+        "  vamp-log-hunter v1.4 · Cazador de IoC en Logs\n"
         "  ────────────────────────────────────────────────────────────────────────\n"
         "  USO EXCLUSIVO EN AUDITORÍAS AUTORIZADAS · El uso no autorizado es ilegal\n"
     )
@@ -1618,6 +1652,9 @@ def _print_findings(console: Console, findings: List[IoCFinding]) -> None:
         lines.append(f"[dim]{f.id}[/]  [{color}]{f.severity}[/]  "
                      f"[dim]Categoría: {f.category}[/]")
 
+        if f.attack:
+            lines.append(f"[dim]ATT&CK: {f.attack}[/]")
+
         if f.tags:
             lines.append(f"[dim]Etiquetas: {', '.join(f.tags)}[/]")
 
@@ -1676,6 +1713,7 @@ def _save_json(findings: List[IoCFinding], path: str) -> None:
                 "id":             f.id,
                 "severity":       f.severity,
                 "category":       f.category,
+                "attack":         f.attack,
                 "title":          f.title,
                 "description":    f.description,
                 "source_ips":     f.source_ips,
@@ -1778,6 +1816,7 @@ def _save_html(findings: List[IoCFinding], path: str) -> None:
     <div class="meta">
       {'<span>IPs: <strong>' + _e(ips_s) + '</strong></span>' if f.source_ips else ''}
       <span>Eventos: <strong>{_e(f.event_count)}</strong></span>
+      {'<span>ATT&amp;CK: <strong>' + _e(f.attack) + '</strong></span>' if f.attack else ''}
       {ts_html}
     </div>
     {ev_html}
@@ -2354,6 +2393,7 @@ def main() -> int:
         if not triage_findings:
             console.print("[green]✓[/]  Triaje rápido completado sin hallazgos críticos.")
             return 0
+        _attach_attack(triage_findings)
         _print_findings(console, triage_findings)
         console.print(
             f"\n[bold yellow]⚡ Triaje completado: {len(triage_findings)} hallazgo(s). "
@@ -2424,6 +2464,7 @@ def main() -> int:
 
     # ── Generación y presentación de hallazgos ───────────────────────────
     findings = scanner.generate_findings()
+    _attach_attack(findings)
 
     # ── Enriquecimiento con Threat Intelligence (--enrich-ips) ───────────
     if getattr(args, "enrich_ips", False):
